@@ -45,11 +45,29 @@ function getindex(c::ChainedVector, i::LinkIndices)
         c.chain[last(i).link][begin:last(i).index]
     )
 
-    vs = Vector{eltype(c.chain)}(undef, length(i.links))
+    vs = Vector{Vector{eltype(eltype(c.chain))}}(undef, length(i.links))
     vs[begin] = c.chain[first(i).link][first(i).index:end]
     vs[end] = c.chain[last(i).link][begin:last(i).index]
     vs[begin + 1:end - 1] .= c.chain[first(i).link + 1:last(i).link - 1]
     return vcat(vs...)
+end
+
+function setindex!(c::ChainedVector, x, i::LinkIndices)
+    length(i.links) == 1 && return setindex!(c.chain[first(i).link], x, i.indices)
+
+    cl = c.chain[first(i).link]
+    xl = lastindex(cl) - first(i).index + 1
+    setindex!(cl, view(x, 1:xl), first(i).index:length(cl))
+
+    for l in first(i).link + 1:last(i).link - 1
+        cl = c.chain[l]
+        setindex!(cl, view(x, xl+1:xl+length(cl)), :)
+        xl += length(cl)
+    end
+
+    setindex!(c.chain[last(i).link], view(x, xl+1:length(x)), 1:last(i).index)
+
+    return getindex(c, i)
 end
 
 tolinkindex(c::ChainedVector, r::AbstractUnitRange) =
